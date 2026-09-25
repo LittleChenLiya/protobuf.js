@@ -1,0 +1,87 @@
+// Fixtures for upgradeMessage tests: V1 is the schema a message was decoded
+// with, V2 the schema to upgrade to and the Bad* variants are incompatible.
+syntax = "proto3";
+
+package upgrade;
+
+message InnerV1 {
+    int32 known = 1;
+}
+
+message InnerV2 {
+    int32 known = 1;
+    string future = 2;
+    repeated int32 vals = 3;
+}
+
+message OuterV1 {
+    int32 known = 1;
+    InnerV1 inner = 2;
+    oneof pick {
+        string pick_a = 3;
+        int32 pick_b = 4;
+    }
+    map<string, int32> counts = 5;
+    string legacy_name = 7;
+    int32 dropped = 8;
+    bytes blob = 12;
+}
+
+message OuterV2 {
+    int64 known = 1; // widened from int32
+    InnerV2 inner = 2;
+    oneof pick {
+        string pick_a = 3;
+        int32 pick_b = 4;
+        int32 pick_c = 10; // new oneof member
+    }
+    map<string, int32> counts = 5;
+    repeated int32 nums = 6; // new repeated field, packed by default
+    string renamed = 7; // renamed from legacy_name, same id and wire semantics
+    int32 dropped2 = 8; // reuses the id of the removed "dropped" field with the same type
+    string added = 9;
+    map<string, int32> labels = 11; // new map field
+    bytes blob = 12;
+}
+
+// Same shape as OuterV2, but the id of "dropped" stays unknown to keep
+// still-unknown bytes around for roundtrip tests.
+message OuterV2Keep {
+    int64 known = 1;
+    InnerV2 inner = 2;
+    oneof pick {
+        string pick_a = 3;
+        int32 pick_b = 4;
+        int32 pick_c = 10;
+    }
+    map<string, int32> counts = 5;
+    repeated int32 nums = 6;
+    string renamed = 7;
+    string added = 9;
+    map<string, int32> labels = 11;
+    bytes blob = 12;
+}
+
+// Incompatible with OuterV1: id 1 changes wire type.
+message OuterBadType {
+    string known = 1;
+}
+
+// Incompatible with OuterV1: id 3 leaves the oneof.
+message OuterBadOneof {
+    int32 known = 1;
+    InnerV2 inner = 2;
+    string pick_a = 3;
+    int32 pick_b = 4;
+}
+
+// Incompatible with OuterV1: id 5 is no longer a map.
+message OuterBadMap {
+    int32 known = 1;
+    InnerV2 inner = 2;
+    oneof pick {
+        string pick_a = 3;
+        int32 pick_b = 4;
+    }
+    repeated int32 counts = 5;
+}

@@ -155,6 +155,29 @@ export function decoder(mtype: Type): Codegen;
  */
 export function encoder(mtype: Type): Codegen;
 
+/**
+ * Upgrades a message decoded with an older schema to a newer schema.
+ *
+ * Field ids present in both types are checked for compatibility up front (wire type,
+ * repeated/map rule and oneof membership, based on the resolved types) and the whole
+ * upgrade is rejected on any conflict. Unknown wire fields preserved on the old message
+ * (see Reader#discardUnknown) that match fields of the new schema are promoted to
+ * accessible fields following protobuf merge semantics (last value wins for singular
+ * scalars, concatenation for repeated fields, merging for singular messages), nested
+ * messages are upgraded recursively and fields renamed in the new schema are exposed
+ * under their new name. Fields removed from the new schema are re-encoded as unknown
+ * data and any still unknown fields are kept as raw bytes, so re-encoding the result
+ * is lossless. Neither the old message nor its unknown field bytes are modified or
+ * shared with the result. Corrupt unknown fields are reported with their field number
+ * and offset.
+ * @param oldType Reflected message type the message was decoded with
+ * @param newType Reflected message type to upgrade to
+ * @param message Message decoded with oldType
+ * @returns Upgraded message of newType
+ * @throws {Error} If the schemas are incompatible or an unknown field is corrupt
+ */
+export function upgradeMessage(oldType: Type, newType: Type, message: (Message<{}>|{ [k: string]: any })): Message<{}>;
+
 /** Reflected enum. */
 export class Enum extends ReflectionObject {
 
@@ -2138,6 +2161,29 @@ export type Properties<T> = { [P in keyof T]?: T[P] };
 
 /** Dynamically reflected message type. */
 export type ReflectedMessage = Message<{}> & { [k: string]: any };
+
+/**
+ * Upgrades a message decoded with an older schema to a newer schema.
+ *
+ * Field ids present in both types are checked for compatibility up front (wire type,
+ * repeated/map rule and oneof membership, based on the resolved types) and the whole
+ * upgrade is rejected on any conflict. Unknown wire fields preserved on the old message
+ * (see Reader#discardUnknown) that match fields of the new schema are promoted to
+ * accessible fields following protobuf merge semantics (last value wins for singular
+ * scalars, concatenation for repeated fields, merging for singular messages), nested
+ * messages are upgraded recursively and fields renamed in the new schema are exposed
+ * under their new name. Fields removed from the new schema are re-encoded as unknown
+ * data and any still unknown fields are kept as raw bytes, so re-encoding the result
+ * is lossless. Neither the old message nor its unknown field bytes are modified or
+ * shared with the result. Corrupt unknown fields are reported with their field number
+ * and offset.
+ * @param oldType Reflected message type the message was decoded with
+ * @param newType Reflected message type to upgrade to
+ * @param message Message decoded with oldType
+ * @returns Upgraded message of newType
+ * @throws {Error} If the schemas are incompatible or an unknown field is corrupt
+ */
+export function upgradeMessage(oldType: Type, newType: Type, message: (Message<{}>|{ [k: string]: any })): Message<{}>;
 
 /**
  * Callback as used by {@link util.asPromise}.
