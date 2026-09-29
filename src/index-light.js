@@ -76,6 +76,7 @@ exports.encoder          = require("./encoder");
 exports.decoder          = require("./decoder");
 exports.verifier         = require("./verifier");
 exports.converter        = require("./converter");
+exports.upgradeMessage   = require("./upgrade");
 
 // Reflection
 exports.ReflectionObject = require("./object");

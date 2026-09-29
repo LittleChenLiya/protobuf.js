@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package upgrade;
+
+message InnerV1 {
+  int32 known = 1;
+}
+
+message InnerV2 {
+  int32 known = 1;
+  string future = 2;
+}
+
+message V1 {
+  int32 known = 1;
+  string old_name = 2;
+  InnerV1 inner = 3;
+  oneof pick {
+    string text = 4;
+  }
+}
+
+message V2 {
+  int32 known = 1;
+  string new_name = 2; // renamed from old_name, same id and wire semantics
+  InnerV2 inner = 3;
+  oneof pick {
+    string text = 4;
+    bool flag = 5;
+  }
+  repeated sint32 nums = 6;
+  map<string, int32> counts = 7;
+  bytes blob = 8;
+  int32 level = 9;
+}
+
+message V2TypeConflict {
+  int64 known = 1;
+}
+
+message V2RepeatedConflict {
+  int32 known = 1;
+  repeated string new_name = 2;
+}
+
+message V2OneofConflict {
+  int32 known = 1;
+  oneof wrap {
+    string new_name = 2;
+  }
+}
+

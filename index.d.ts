@@ -2140,6 +2140,21 @@ export type Properties<T> = { [P in keyof T]?: T[P] };
 export type ReflectedMessage = Message<{}> & { [k: string]: any };
 
 /**
+ * Upgrades a message decoded with an older schema to a newer schema by promoting
+ * matching unknown wire fields to accessible fields. Field compatibility is checked
+ * by field id against the resolved types (not by field name); if any shared field id
+ * is incompatible, the entire upgrade is rejected. The source message is not modified
+ * and no mutable bytes are shared with it.
+ * @param oldType Message type the message was decoded with
+ * @param newType Message type to upgrade to
+ * @param message Message decoded with oldType, with $unknowns preserved
+ * @returns Upgraded message of newType with any still-unknown fields retained in $unknowns
+ * @throws {TypeError} If arguments are invalid
+ * @throws {Error} If the schemas are incompatible or an unknown field is corrupt
+ */
+export function upgradeMessage(oldType: Type, newType: Type, message: (Message<{}>|{ [k: string]: any })): Message<{}>;
+
+/**
  * Callback as used by {@link util.asPromise}.
  * @param error Error, if any
  * @param params Additional arguments
