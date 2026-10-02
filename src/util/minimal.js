@@ -283,6 +283,117 @@ util.boolFromKey = function boolFromKey(key) {
 };
 
 /**
+ * Compares two boolean map keys for deterministic encoding (`false` sorts before `true`).
+ * @param {string} a First key
+ * @param {string} b Second key
+ * @returns {number} Comparison result
+ */
+util.compareBoolKeys = function compareBoolKeys(a, b) {
+    var av = util.boolFromKey(a) ? 1 : 0,
+        bv = util.boolFromKey(b) ? 1 : 0;
+    return av - bv;
+};
+
+/**
+ * Compares two 32 bit integer map keys for deterministic encoding by their exact numeric value.
+ * @param {string} a First key
+ * @param {string} b Second key
+ * @returns {number} Comparison result
+ */
+util.compareIntKeys = function compareIntKeys(a, b) {
+    var an = parseInt(a, 10),
+        bn = parseInt(b, 10);
+    return an < bn ? -1 : an > bn ? 1 : 0;
+};
+
+// Converts a 64 bit map key to its exact 64 bit two's complement bit pattern
+// without going through a precision-losing Number conversion.
+function longKeyToBits(key) {
+    // 8 characters long hash strings are used as keys when no Long library is present
+    if (key.length === 8 && !util.key32Re.test(key))
+        return util.LongBits.fromHash(key);
+    var negative = key.charCodeAt(0) === 45, // "-"
+        lo = 0,
+        hi = 0,
+        i = negative ? 1 : 0;
+    for (; i < key.length; ++i) {
+        var digit = key.charCodeAt(i) - 48;
+        // bits = bits * 10 + digit, exact because each step stays below 2^53
+        lo = lo * 10 + digit;
+        hi = hi * 10 + Math.floor(lo / 4294967296);
+        lo %= 4294967296;
+        hi %= 4294967296;
+    }
+    if (negative) {
+        var nlo = (~lo >>> 0) + 1,
+            carry = nlo === 4294967296 ? 1 : 0;
+        lo = nlo % 4294967296;
+        hi = ((~hi >>> 0) + carry) % 4294967296;
+    }
+    return { lo: lo, hi: hi };
+}
+
+// Compares two 64 bit map keys by their exact bit patterns.
+function compareLongKeys(a, b, unsigned) {
+    var ab = longKeyToBits(a),
+        bb = longKeyToBits(b);
+    if (!unsigned) {
+        var aNeg = ab.hi >= 2147483648,
+            bNeg = bb.hi >= 2147483648;
+        if (aNeg !== bNeg)
+            return aNeg ? -1 : 1;
+    }
+    if (ab.hi !== bb.hi)
+        return ab.hi < bb.hi ? -1 : 1;
+    return ab.lo === bb.lo ? 0 : ab.lo < bb.lo ? -1 : 1;
+}
+
+/**
+ * Compares two signed 64 bit integer map keys for deterministic encoding by their exact numeric value.
+ * @param {string} a First key
+ * @param {string} b Second key
+ * @returns {number} Comparison result
+ */
+util.compareInt64Keys = function compareInt64Keys(a, b) {
+    return compareLongKeys(a, b, false);
+};
+
+/**
+ * Compares two unsigned 64 bit integer map keys for deterministic encoding by their exact numeric value.
+ * @param {string} a First key
+ * @param {string} b Second key
+ * @returns {number} Comparison result
+ */
+util.compareUint64Keys = function compareUint64Keys(a, b) {
+    return compareLongKeys(a, b, true);
+};
+
+/**
+ * Compares two string map keys for deterministic encoding by UTF-8 byte order.
+ * @param {string} a First key
+ * @param {string} b Second key
+ * @returns {number} Comparison result
+ */
+util.compareStringKeys = function compareStringKeys(a, b) {
+    // UTF-8 byte order is equivalent to Unicode code point order
+    var i = 0,
+        j = 0;
+    while (i < a.length && j < b.length) {
+        var ac = a.codePointAt(i),
+            bc = b.codePointAt(j);
+        if (ac !== bc)
+            return ac < bc ? -1 : 1;
+        i += ac > 0xffff ? 2 : 1;
+        j += bc > 0xffff ? 2 : 1;
+    }
+    if (i < a.length)
+        return 1;
+    if (j < b.length)
+        return -1;
+    return 0;
+};
+
+/**
  * Merges the properties of the source object into the destination object.
  * @memberof util
  * @param {Object.<string,*>} dst Destination object

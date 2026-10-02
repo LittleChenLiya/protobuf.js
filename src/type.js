@@ -245,6 +245,7 @@ Type.generateConstructor = function generateConstructor(mtype) {
 function clearCache(type) {
     type._fieldsById = type._fieldsArray = type._oneofsArray = type._fieldsByJsonName = null;
     delete type.encode;
+    delete type.encodeDeterministic;
     delete type.decode;
     delete type.verify;
     return type;
@@ -523,6 +524,11 @@ Type.prototype.setup = function setup() {
         types  : types,
         util   : util
     });
+    this.encodeDeterministic = encoder(this, true)({
+        Writer : Writer,
+        types  : types,
+        util   : util
+    });
     this.decode = decoder(this)({
         Reader : Reader,
         types  : types,
@@ -566,6 +572,16 @@ Type.prototype.setup = function setup() {
  */
 Type.prototype.encode = function encode_setup(message, writer) { // eslint-disable-line no-unused-vars
     return this.setup().encode.apply(this, arguments); // overrides this method
+};
+
+/**
+ * Encodes a message of this type deterministically: fields are written sequentially by field number and map entries are sorted by key, so that the same logical message always encodes to the same bytes. Does not implicitly {@link Type#verify|verify} messages.
+ * @param {Message<{}>|Object.<string,*>} message Message instance or plain object
+ * @param {Writer} [writer] Writer to encode to
+ * @returns {Writer} writer
+ */
+Type.prototype.encodeDeterministic = function encodeDeterministic_setup(message, writer) { // eslint-disable-line no-unused-vars
+    return this.setup().encodeDeterministic.apply(this, arguments); // overrides this method
 };
 
 /**

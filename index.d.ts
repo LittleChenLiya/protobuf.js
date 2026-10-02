@@ -151,9 +151,10 @@ export function decoder(mtype: Type): Codegen;
 /**
  * Generates an encoder specific to the specified message type.
  * @param mtype Message type
+ * @param [deterministic=false] Whether to generate a deterministic encoder that sorts map keys
  * @returns Codegen instance
  */
-export function encoder(mtype: Type): Codegen;
+export function encoder(mtype: Type, deterministic?: boolean): Codegen;
 
 /** Reflected enum. */
 export class Enum extends ReflectionObject {
@@ -619,6 +620,14 @@ export class Message<T extends object = object> {
      * @returns Writer
      */
     static encode<T extends Message<T>>(this: Constructor<T>, message: (T|{ [k: string]: any }), writer?: Writer): Writer;
+
+    /**
+     * Encodes a message of this type deterministically, so that the same logical message always encodes to the same bytes.
+     * @param message Message to encode
+     * @param [writer] Writer to encode to
+     * @returns Writer
+     */
+    static encodeDeterministic<T extends Message<T>>(this: Constructor<T>, message: (T|{ [k: string]: any }), writer?: Writer): Writer;
 
     /**
      * Encodes a message of this type preceeded by its length as a varint.
@@ -1906,6 +1915,14 @@ export class Type extends NamespaceBase {
     encode(message: (Message<{}>|{ [k: string]: any }), writer?: Writer): Writer;
 
     /**
+     * Encodes a message of this type deterministically: fields are written sequentially by field number and map entries are sorted by key, so that the same logical message always encodes to the same bytes. Does not implicitly {@link Type#verify|verify} messages.
+     * @param message Message instance or plain object
+     * @param [writer] Writer to encode to
+     * @returns writer
+     */
+    encodeDeterministic(message: (Message<{}>|{ [k: string]: any }), writer?: Writer): Writer;
+
+    /**
      * Encodes a message of this type preceeded by its byte length as a varint. Does not implicitly {@link Type#verify|verify} messages.
      * @param message Message instance or plain object
      * @param [writer] Writer to encode to
@@ -2617,6 +2634,46 @@ export namespace util {
      * @returns Boolean value
      */
     function boolFromKey(key: string): boolean;
+
+    /**
+     * Compares two boolean map keys for deterministic encoding (`false` sorts before `true`).
+     * @param a First key
+     * @param b Second key
+     * @returns Comparison result
+     */
+    function compareBoolKeys(a: string, b: string): number;
+
+    /**
+     * Compares two 32 bit integer map keys for deterministic encoding by their exact numeric value.
+     * @param a First key
+     * @param b Second key
+     * @returns Comparison result
+     */
+    function compareIntKeys(a: string, b: string): number;
+
+    /**
+     * Compares two signed 64 bit integer map keys for deterministic encoding by their exact numeric value.
+     * @param a First key
+     * @param b Second key
+     * @returns Comparison result
+     */
+    function compareInt64Keys(a: string, b: string): number;
+
+    /**
+     * Compares two unsigned 64 bit integer map keys for deterministic encoding by their exact numeric value.
+     * @param a First key
+     * @param b Second key
+     * @returns Comparison result
+     */
+    function compareUint64Keys(a: string, b: string): number;
+
+    /**
+     * Compares two string map keys for deterministic encoding by UTF-8 byte order.
+     * @param a First key
+     * @param b Second key
+     * @returns Comparison result
+     */
+    function compareStringKeys(a: string, b: string): number;
 
     /**
      * Merges the properties of the source object into the destination object.

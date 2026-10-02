@@ -57,6 +57,18 @@ Message.encode = function encode(message, writer) {
 };
 
 /**
+ * Encodes a message of this type deterministically, so that the same logical message always encodes to the same bytes.
+ * @param {T|Object.<string,*>} message Message to encode
+ * @param {Writer} [writer] Writer to encode to
+ * @returns {Writer} Writer
+ * @template T extends Message<T>
+ * @this Constructor<T>
+ */
+Message.encodeDeterministic = function encodeDeterministic(message, writer) {
+    return this.$type.encodeDeterministic(message, writer);
+};
+
+/**
  * Encodes a message of this type preceeded by its length as a varint.
  * @param {T|Object.<string,*>} message Message to encode
  * @param {Writer} [writer] Writer to use
