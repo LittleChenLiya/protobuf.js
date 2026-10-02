@@ -11,21 +11,24 @@ var Enum     = require("./enum"),
  * @param {Field} field Reflected field
  * @param {number} fieldIndex Field index
  * @param {string} ref Variable reference
+ * @param {boolean} [deterministic=false] Whether to encode deterministically
  * @returns {Codegen} Codegen instance
  * @ignore
  */
-function genTypePartial(gen, field, fieldIndex, ref) {
+function genTypePartial(gen, field, fieldIndex, ref, deterministic) {
+    var encodeMethod = deterministic ? "encodeDeterministic" : "encode";
     return field.delimited
-        ? gen("types[%i].encode(%s,w.uint32(%i),q+1).uint32(%i)", fieldIndex, ref, (field.id << 3 | 3) >>> 0, (field.id << 3 | 4) >>> 0)
-        : gen("types[%i].encode(%s,w.uint32(%i).fork(),q+1).ldelim()", fieldIndex, ref, (field.id << 3 | 2) >>> 0);
+        ? gen("types[%i].%s(%s,w.uint32(%i),q+1).uint32(%i)", fieldIndex, encodeMethod, ref, (field.id << 3 | 3) >>> 0, (field.id << 3 | 4) >>> 0)
+        : gen("types[%i].%s(%s,w.uint32(%i).fork(),q+1).ldelim()", fieldIndex, encodeMethod, ref, (field.id << 3 | 2) >>> 0);
 }
 
 /**
  * Generates an encoder specific to the specified message type.
  * @param {Type} mtype Message type
+ * @param {boolean} [deterministic=false] Whether to sort map keys deterministically
  * @returns {Codegen} Codegen instance
  */
-function encoder(mtype) {
+function encoder(mtype, deterministic) {
     /* eslint-disable no-unexpected-multiline, block-scoped-var, no-redeclare */
     var gen = util.codegen(["m", "w", "q"])
     ("if(!w)")
@@ -49,7 +52,10 @@ function encoder(mtype) {
         // Map fields
         if (field.map) {
             gen
-    ("if(%s!=null&&Object.hasOwnProperty.call(m,%j)){", ref, field.name) // !== undefined && !== null
+    ("if(%s!=null&&Object.hasOwnProperty.call(m,%j)){", ref, field.name); // !== undefined && !== null
+            if (deterministic) gen
+        ("for(var ks=util.sortMapKeys(%s,%j),i=0;i<ks.length;++i){", ref, field.keyType);
+            else gen
         ("for(var ks=Object.keys(%s),i=0;i<ks.length;++i){", ref);
             if (field.keyType === "bool") gen
             ("w.uint32(%i).fork().uint32(%i).bool(util.boolFromKey(ks[i]))", (field.id << 3 | 2) >>> 0, 8 | types.mapKey[field.keyType]);
@@ -58,7 +64,7 @@ function encoder(mtype) {
             else gen
             ("w.uint32(%i).fork().uint32(%i).%s(ks[i])", (field.id << 3 | 2) >>> 0, 8 | types.mapKey[field.keyType], field.keyType);
             if (wireType === undefined) gen
-            ("types[%i].encode(%s[ks[i]],w.uint32(18).fork(),q+1).ldelim().ldelim()", index, ref); // can't be groups
+            ("types[%i].%s(%s[ks[i]],w.uint32(18).fork(),q+1).ldelim().ldelim()", index, deterministic ? "encodeDeterministic" : "encode", ref); // can't be groups
             else gen
             (".uint32(%i).%s(%s[ks[i]]).ldelim()", 16 | wireType, type, ref);
             gen
@@ -79,7 +85,7 @@ function encoder(mtype) {
 
         ("for(var i=0;i<%s.length;++i)", ref);
                 if (wireType === undefined)
-            genTypePartial(gen, field, index, ref + "[i]");
+            genTypePartial(gen, field, index, ref + "[i]", deterministic);
                 else gen
             ("w.uint32(%i).%s(%s[i])", (field.id << 3 | wireType) >>> 0, type, ref);
 
@@ -107,7 +113,7 @@ function encoder(mtype) {
     ("if(%s!=null&&Object.hasOwnProperty.call(m,%j)&&%s!==0)", ref, field.name, ref);
 
             if (wireType === undefined)
-        genTypePartial(gen, field, index, ref);
+        genTypePartial(gen, field, index, ref, deterministic);
             else gen
         ("w.uint32(%i).%s(%s)", (field.id << 3 | wireType) >>> 0, type, ref);
 

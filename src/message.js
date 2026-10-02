@@ -69,6 +69,19 @@ Message.encodeDelimited = function encodeDelimited(message, writer) {
 };
 
 /**
+ * Encodes a message of this type deterministically, so that the same logical message always
+ * produces the same bytes. See {@link Type#encodeDeterministic} for details.
+ * @param {T|Object.<string,*>} message Message to encode
+ * @param {Writer} [writer] Writer to use
+ * @returns {Writer} Writer
+ * @template T extends Message<T>
+ * @this Constructor<T>
+ */
+Message.encodeDeterministic = function encodeDeterministic(message, writer) {
+    return this.$type.encodeDeterministic(message, writer);
+};
+
+/**
  * Decodes a message of this type.
  * @name Message.decode
  * @function

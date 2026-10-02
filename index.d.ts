@@ -151,9 +151,10 @@ export function decoder(mtype: Type): Codegen;
 /**
  * Generates an encoder specific to the specified message type.
  * @param mtype Message type
+ * @param [deterministic=false] Whether to sort map keys deterministically
  * @returns Codegen instance
  */
-export function encoder(mtype: Type): Codegen;
+export function encoder(mtype: Type, deterministic?: boolean): Codegen;
 
 /** Reflected enum. */
 export class Enum extends ReflectionObject {
@@ -627,6 +628,15 @@ export class Message<T extends object = object> {
      * @returns Writer
      */
     static encodeDelimited<T extends Message<T>>(this: Constructor<T>, message: (T|{ [k: string]: any }), writer?: Writer): Writer;
+
+    /**
+     * Encodes a message of this type deterministically, so that the same logical message always
+     * produces the same bytes. See {@link Type#encodeDeterministic} for details.
+     * @param message Message to encode
+     * @param [writer] Writer to use
+     * @returns Writer
+     */
+    static encodeDeterministic<T extends Message<T>>(this: Constructor<T>, message: (T|{ [k: string]: any }), writer?: Writer): Writer;
 
     /**
      * Decodes a message of this type.
@@ -1914,6 +1924,21 @@ export class Type extends NamespaceBase {
     encodeDelimited(message: (Message<{}>|{ [k: string]: any }), writer?: Writer): Writer;
 
     /**
+     * Encodes a message of this type deterministically. Does not implicitly {@link Type#verify|verify} messages.
+     *
+     * Deterministic encoding guarantees that the same logical message always produces the same bytes,
+     * which makes the output suitable for content hashing and digests: fields are written sequentially
+     * by field number and map entries are sorted by key, with booleans sorting 'false' before 'true',
+     * integers sorting by their exact numeric value (64 bit keys are compared without converting them
+     * to precision-losing numbers) and strings sorting by UTF-8 byte order. Nested messages are encoded
+     * deterministically as well.
+     * @param message Message instance or plain object
+     * @param [writer] Writer to encode to
+     * @returns writer
+     */
+    encodeDeterministic(message: (Message<{}>|{ [k: string]: any }), writer?: Writer): Writer;
+
+    /**
      * Decodes a message of this type.
      * @param reader Reader or buffer to decode from
      * @param [length] Length of the message, if known beforehand
@@ -2617,6 +2642,17 @@ export namespace util {
      * @returns Boolean value
      */
     function boolFromKey(key: string): boolean;
+
+    /**
+     * Returns the keys of a map field sorted deterministically according to the protobuf deterministic
+     * serialization rules: booleans sort 'false' before 'true', integers sort by their exact numeric
+     * value (64 bit keys are compared without converting them to precision-losing numbers) and strings
+     * sort by UTF-8 byte order.
+     * @param obj Map field object
+     * @param keyType Map key type
+     * @returns Sorted keys
+     */
+    function sortMapKeys(obj: { [k: string]: any }, keyType: string): string[];
 
     /**
      * Merges the properties of the source object into the destination object.

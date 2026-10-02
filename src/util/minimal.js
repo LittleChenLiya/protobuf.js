@@ -283,6 +283,128 @@ util.boolFromKey = function boolFromKey(key) {
 };
 
 /**
+ * Compares two string map keys by UTF-8 byte order (which is equivalent to code point order).
+ * @param {string} a First key
+ * @param {string} b Second key
+ * @returns {number} Comparison result
+ * @ignore
+ */
+function compareStringKeys(a, b) {
+    var ai = 0,
+        bi = 0;
+    while (ai < a.length && bi < b.length) {
+        var ac = a.codePointAt(ai),
+            bc = b.codePointAt(bi);
+        if (ac !== bc)
+            return ac < bc ? -1 : 1;
+        ai += ac > 0xffff ? 2 : 1;
+        bi += bc > 0xffff ? 2 : 1;
+    }
+    if (ai < a.length)
+        return 1;
+    if (bi < b.length)
+        return -1;
+    return 0;
+}
+
+/**
+ * Converts a 64 bit map key, either a decimal string or an 8 characters long hash string, to its
+ * two's complement bit representation without ever passing through a precision-losing number.
+ * @param {string} key Map key
+ * @returns {Object} Bits-like object with 'lo' and 'hi' unsigned 32 bit parts
+ * @ignore
+ */
+function longKeyToBits(key) {
+    if (!util.key32Re.test(key))
+        return util.LongBits.fromHash(key);
+    var negative = key.charAt(0) === "-",
+        lo = 0,
+        hi = 0;
+    for (var i = negative ? 1 : 0; i < key.length; ++i) {
+        var nlo = lo * 10 + (key.charCodeAt(i) - 48),
+            carry = Math.floor(nlo / 4294967296);
+        lo = nlo - carry * 4294967296;
+        hi = (hi * 10 + carry) % 4294967296;
+    }
+    if (negative) {
+        var nlo2 = (~lo >>> 0) + 1,
+            carry2 = nlo2 === 4294967296 ? 1 : 0;
+        lo = carry2 ? 0 : nlo2;
+        hi = ((~hi >>> 0) + carry2) % 4294967296;
+    }
+    return { lo: lo, hi: hi };
+}
+
+/**
+ * Returns a comparator sorting 64 bit map keys by their exact numeric value.
+ * @param {boolean} signed Whether the key type is signed
+ * @returns {function(string, string): number} Comparator
+ * @ignore
+ */
+function longKeyComparator(signed) {
+    return function compareLongKeys(a, b) {
+        var ab = longKeyToBits(a),
+            bb = longKeyToBits(b),
+            ahi = ab.hi >>> 0,
+            bhi = bb.hi >>> 0;
+        if (signed) { // flip the sign bit so that two's complement order becomes numeric order
+            ahi = (ahi ^ 0x80000000) >>> 0;
+            bhi = (bhi ^ 0x80000000) >>> 0;
+        }
+        if (ahi !== bhi)
+            return ahi < bhi ? -1 : 1;
+        var alo = ab.lo >>> 0,
+            blo = bb.lo >>> 0;
+        if (alo !== blo)
+            return alo < blo ? -1 : 1;
+        return 0;
+    };
+}
+
+/**
+ * Returns the rank of a boolean map key, sorting 'false' before 'true'.
+ * @param {string} key Map key
+ * @returns {number} Rank
+ * @ignore
+ */
+function boolKeyRank(key) {
+    return key === "true" || key === "1" ? 1 : 0;
+}
+
+var mapKeyComparators = {
+    "bool"    : function compareBoolKeys(a, b) { return boolKeyRank(a) - boolKeyRank(b); },
+    "string"  : compareStringKeys,
+    "int32"   : function compareInt32Keys(a, b) { return Number(a) - Number(b); },
+    "uint32"  : function compareUint32Keys(a, b) { return Number(a) - Number(b); },
+    "sint32"  : function compareSint32Keys(a, b) { return Number(a) - Number(b); },
+    "fixed32" : function compareFixed32Keys(a, b) { return Number(a) - Number(b); },
+    "sfixed32": function compareSfixed32Keys(a, b) { return Number(a) - Number(b); },
+    "int64"   : longKeyComparator(true),
+    "sint64"  : longKeyComparator(true),
+    "sfixed64": longKeyComparator(true),
+    "uint64"  : longKeyComparator(false),
+    "fixed64" : longKeyComparator(false)
+};
+
+/**
+ * Returns the keys of a map field sorted deterministically according to the protobuf deterministic
+ * serialization rules: booleans sort 'false' before 'true', integers sort by their exact numeric
+ * value (64 bit keys are compared without converting them to precision-losing numbers) and strings
+ * sort by UTF-8 byte order.
+ * @memberof util
+ * @param {Object.<string,*>} obj Map field object
+ * @param {string} keyType Map key type
+ * @returns {string[]} Sorted keys
+ */
+util.sortMapKeys = function sortMapKeys(obj, keyType) {
+    var keys = Object.keys(obj),
+        comparator = mapKeyComparators[keyType];
+    if (comparator && keys.length > 1)
+        keys.sort(comparator);
+    return keys;
+};
+
+/**
  * Merges the properties of the source object into the destination object.
  * @memberof util
  * @param {Object.<string,*>} dst Destination object

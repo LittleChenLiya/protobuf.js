@@ -247,6 +247,7 @@ function clearCache(type) {
     delete type.encode;
     delete type.decode;
     delete type.verify;
+    delete type._deterministicEncoder;
     return type;
 }
 
@@ -576,6 +577,35 @@ Type.prototype.encode = function encode_setup(message, writer) { // eslint-disab
  */
 Type.prototype.encodeDelimited = function encodeDelimited(message, writer) {
     return this.encode(message, (writer || Writer.create()).fork()).ldelim();
+};
+
+/**
+ * Encodes a message of this type deterministically. Does not implicitly {@link Type#verify|verify} messages.
+ *
+ * Deterministic encoding guarantees that the same logical message always produces the same bytes,
+ * which makes the output suitable for content hashing and digests: fields are written sequentially
+ * by field number and map entries are sorted by key, with booleans sorting 'false' before 'true',
+ * integers sorting by their exact numeric value (64 bit keys are compared without converting them
+ * to precision-losing numbers) and strings sorting by UTF-8 byte order. Nested messages are encoded
+ * deterministically as well.
+ * @param {Message<{}>|Object.<string,*>} message Message instance or plain object
+ * @param {Writer} [writer] Writer to encode to
+ * @returns {Writer} writer
+ */
+Type.prototype.encodeDeterministic = function encodeDeterministic(message, writer) {
+    if (!this._deterministicEncoder) {
+        if (!Object.prototype.hasOwnProperty.call(this, "encode"))
+            this.setup(); // resolves fields and features, sets up the other codecs
+        var types = [];
+        for (var i = 0; i < /* initializes */ this.fieldsArray.length; ++i)
+            types.push(this._fieldsArray[i].resolve().resolvedType);
+        this._deterministicEncoder = encoder(this, true)({
+            Writer : Writer,
+            types  : types,
+            util   : util
+        });
+    }
+    return this._deterministicEncoder(message, writer);
 };
 
 /**
